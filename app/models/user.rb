@@ -21,7 +21,7 @@ class User < ApplicationRecord
   # example) validates :username, length: { in: 3..30 }, format: { with: /[a-zA-Z_-0-9]/, message: "can't be an email" }
 
   validates :username, :email, :session_token, presence: true, uniqueness: true
-  validates :username, length: { in: 3..30 }format: { without: URI::MailTo::EMAIL_REGEXP, message:  "can't be an email" }
+  validates :username, length: { in: 3..30 }, format: { without: URI::MailTo::EMAIL_REGEXP, message:  "can't be an email" }
   validates :email, length: { in: 3..255 }, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :password, length: { in: 6..255 }, allow_nil: true
 
@@ -31,8 +31,14 @@ class User < ApplicationRecord
   # from our user model, we can do active record queries
   # given a username, find a user
   # User.find_by(key: value)
-  def self.find_by_credentials(username, password)
-    @user = User.find_by(username: username)
+
+  def self.find_by_credentials(credential, password)
+    if credential.match(URI::MailTo::EMAIL_REGEXP) 
+      @user = User.find_by(email: credential)
+    else
+      @user = User.find_by(username: credential)
+    end
+
     if @user && @user.is_password?(password) 
       return @user
     else
@@ -40,16 +46,16 @@ class User < ApplicationRecord
     end
   end
 
-  def password=(password)
-    @password = password
-    self.password_digest = BCrypt::Password.create(password)
-  end
+  # def password=(password)
+  #   @password = password
+  #   self.password_digest = BCrypt::Password.create(password)
+  # end
 
   def is_password?(password)
     BCrypt::Password.new(self.password_digest).is_password?(password)
   end
 
-  def reset_session_token
+  def reset_session_token!
     self.session_token = generate_unique_session_token
     self.save!
     self.session_token
@@ -58,7 +64,7 @@ class User < ApplicationRecord
   private
   def generate_unique_session_token
     token = SecureRandom::urlsafe_base64
-    while User.exists?
+    while User.exists?(session_token: token)
       token = SecureRandom::urlsafe_base64
     end
     token
