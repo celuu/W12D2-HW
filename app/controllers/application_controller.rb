@@ -1,12 +1,11 @@
-include ActionController::RequestForgeryProtection
-
 class ApplicationController < ActionController::API
-    before_action :snake_case_params, :attach_authenticity_token
-    helper_method :current_user
+    include ActionController::RequestForgeryProtection
     protect_from_forgery with: :exception
+    before_action :snake_case_params, :attach_authenticity_token
+    # isnt required anymore
+    # helper_method :current_user
     rescue_from StandardError, with: :unhandled_error
-    rescue_from ActionController::InvalidAuthenticityToken,
-        with: :invalid_authenticity_token
+    rescue_from ActionController::InvalidAuthenticityToken, with: :invalid_authenticity_token
 
     def current_user
         @current_user ||= User.find_by(session_token: session[:session_token])
@@ -31,11 +30,15 @@ class ApplicationController < ActionController::API
 
     private
     def snake_case_params
+        # convert incoming request data from camelCase to snake_case
         params.deep_transform_keys!(&:underscore)
     end
 
     def attach_authenticity_token
+        # add CSRF token to response headers
         headers['X-CSRF-Token'] = masked_authenticity_token(session)
+        # same as:
+        # headers['X-CSRF-Token'] = form_authenticity_token
     end
 
     def invalid_authenticity_token
@@ -50,7 +53,6 @@ class ApplicationController < ActionController::API
             @message = "#{error.class} - #{error.message}"
             @stack = Rails::BacktraceCleaner.new.clean(error.backtrace)
             render 'api/errors/internal_server_error', status: :internal_server_error
-            
             logger.error "\n#{@message}:\n\t#{@stack.join("\n\t")}\n"
         end
     end
